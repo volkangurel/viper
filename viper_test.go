@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -1218,4 +1219,31 @@ func BenchmarkGetBoolFromMap(b *testing.B) {
 			b.Fatal("Map value was false")
 		}
 	}
+}
+
+func TestReadDir(t *testing.T) {
+	dir, err := ioutil.TempDir("", "viper_test")
+	if err != nil {
+		t.Fatalf("unable to create temporary directory, %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "app", "service"), 0700); err != nil {
+		t.Fatalf("unable to create directory, %v", err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(dir, "app", "service", "url"), []byte(`https://donuts/api/1/`), 0600); err != nil {
+		t.Fatalf("unable to create file, %v", err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(dir, "app", "service", "key"), []byte(`0123456789abcdef`), 0600); err != nil {
+		t.Fatalf("unable to create file, %v", err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(dir, "app", "debug"), []byte(`true`), 0600); err != nil {
+		t.Fatalf("unable to create file, %v", err)
+	}
+
+	v := New()
+	v.ReadDir(dir)
+	t.Log(v.AllSettings())
+
+	assert.True(t, v.GetBool("app.debug"))
+	assert.Equal(t, "https://donuts/api/1/", v.Get("app.service.url"))
+	assert.Equal(t, "0123456789abcdef", v.Get("app.service.key"))
 }

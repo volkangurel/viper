@@ -24,6 +24,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -53,7 +54,7 @@ func init() {
 type remoteConfigFactory interface {
 	Get(rp RemoteProvider) (io.Reader, error)
 	Watch(rp RemoteProvider) (io.Reader, error)
-	WatchChannel(rp RemoteProvider)(<-chan *RemoteResponse, chan bool)
+	WatchChannel(rp RemoteProvider) (<-chan *RemoteResponse, chan bool)
 }
 
 // RemoteConfig is optional, see the remote package
@@ -1269,6 +1270,42 @@ func mergeMaps(
 			}
 		}
 	}
+}
+
+// Loads configuration from a directory tree where filenames are keys
+// and file contents are values.
+func ReadDir(dirname string) error { return v.ReadDir(dirname) }
+func (v *Viper) ReadDir(dirname string) error {
+	config, err := v.readDir(dirname, "")
+	if err == nil {
+		v.config = config
+	}
+	return err
+}
+
+func (v *Viper) readDir(dirname, keyPrefix string) (map[string]interface{}, error) {
+	entries, err := ioutil.ReadDir(dirname)
+	if err != nil {
+		return nil, err
+	}
+
+	node := make(map[string]interface{})
+	for _, entry := range entries {
+		path := filepath.Join(dirname, entry.Name())
+		if entry.IsDir() {
+			node[entry.Name()], err = v.readDir(path, keyPrefix+v.keyDelim+entry.Name())
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			value, err := ioutil.ReadFile(path)
+			if err != nil {
+				return nil, err
+			}
+			node[entry.Name()] = strings.TrimRight(string(value), "\r\n")
+		}
+	}
+	return node, nil
 }
 
 // ReadRemoteConfig attempts to get configuration from a remote source
