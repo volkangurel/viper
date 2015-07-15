@@ -1240,7 +1240,8 @@ func TestReadDir(t *testing.T) {
 	}
 
 	v := New()
-	v.ReadDir(dir)
+	v.AddConfigPath(dir)
+	v.ReadInConfigDir()
 	t.Log(v.AllSettings())
 
 	assert.True(t, v.GetBool("app.debug"))
