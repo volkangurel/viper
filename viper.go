@@ -1273,16 +1273,21 @@ func mergeMaps(
 }
 
 // Loads configuration from a directory tree where filenames are keys
-// and file contents are values.
+// and file contents are values, using the config paths
 func ReadInConfigDir() error { return v.ReadInConfigDir() }
 func (v *Viper) ReadInConfigDir() error {
 	for _, cp := range v.configPaths {
 		if _, err := os.Stat(cp); err == nil {
 			config, err := v.readDir(cp, "")
-			if err == nil {
-				v.config = config
+			if err != nil {
+				jww.WARN.Printf("Failed to parse config path: %s\n", err)
+				continue
 			}
-			return err
+			if v.config == nil {
+				v.config = config
+			} else {
+				mergeMaps(config, v.config, nil)
+			}
 		}
 	}
 	return nil
@@ -1296,6 +1301,10 @@ func (v *Viper) readDir(dirname, keyPrefix string) (map[string]interface{}, erro
 
 	node := make(map[string]interface{})
 	for _, entry := range entries {
+		// Ignore paths starting with .., which might appear on Kubernetes
+		if strings.HasPrefix(entry.Name(), "..") {
+			continue
+		}
 		path := filepath.Join(dirname, entry.Name())
 		if entry.IsDir() {
 			node[entry.Name()], err = v.readDir(path, keyPrefix+v.keyDelim+entry.Name())
